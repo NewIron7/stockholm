@@ -7,3 +7,10 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.0", features = ["cargo"] }
+magic-crypt = "3.1.13"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+rand_core = "0.6.4"
+hex = "0.4.3"
+whoami = "1.4.1"
+base64 = "0.21.7"
