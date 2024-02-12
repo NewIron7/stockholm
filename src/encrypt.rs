@@ -13,7 +13,14 @@ pub fn encrypt(key: &str, message: &str) -> String {
 
 pub fn decrypt(key: &str, base64: &str) -> String {
     let mc = new_magic_crypt!(key, 256);
-    mc.decrypt_base64_to_string(base64).unwrap()
+    let result = mc.decrypt_base64_to_string(base64);
+    match result {
+        Ok(result) => result,
+        Err(e) => {
+            println!("⚠️ Error while decrypting the content: {:?}", e);
+            String::new()
+        }
+    }
 }
 
 /// Function that decrypt the message with the key
@@ -23,11 +30,7 @@ pub fn decrypt(key: &str, base64: &str) -> String {
 /// - message: the message to decrypt
 /// Returns:
 /// - the decrypted message
-pub fn decrypt_message(message: &str) -> String {
-    let key = std::fs::read_to_string(".encrypt.key").unwrap_or_default();
-    if key.is_empty() {
-        return String::new();
-    }
+pub fn decrypt_message(message: &str, key: &str) -> String {
     decrypt(&key, message)
 }
 
